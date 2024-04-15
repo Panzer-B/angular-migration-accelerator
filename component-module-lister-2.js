@@ -35,16 +35,18 @@ async function findAngularComponents(dir, allFiles = {}) {
 }
 
 function resolveModulePath(filePath) {
-    const possiblePaths = Object.entries(tsconfigPaths).filter(([key, value]) =>
-        value.some(val => val.includes('index.ts')));
-    for (let [alias, paths] of possiblePaths) {
-        for (let p of paths) {
-            const fullP = path.join(path.dirname(filePath), p.replace('*', ''));
-            if (fs.existsSync(fullP)) {
-                return fullP;
-            }
-        }
+    const dirPath = path.dirname(filePath);
+    const aliasEntry = Object.entries(tsconfigPaths).find(([key, values]) =>
+        values.some(value => {
+            const tsConfigPath = path.resolve(path.dirname(filePath), value.replace('/*', ''));
+            return dirPath.startsWith(path.dirname(tsConfigPath));
+        })
+    );
+
+    if (aliasEntry) {
+        return aliasEntry[0];
     }
+
     return filePath;
 }
 
