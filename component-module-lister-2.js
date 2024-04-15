@@ -1,3 +1,13 @@
+/**
+*
+*{
+*    "ice-button": {
+*        "moduleName": "NgxButtonModule",
+*        "path": "@ui/buttons"
+*    }
+*}
+*/
+
 const fs = require('fs');
 const path = require('path');
 const { promisify } = require('util');
