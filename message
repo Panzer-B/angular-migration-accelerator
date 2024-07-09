@@ -1,0 +1,3 @@
+Recently, we have observed that even the smallest changes in our codebase are taking around 18 minutes to execute, whereas previously, on Jenkins, the same tasks were completed in approximately 3 minutes.
+
+This considerable increase in execution time is impacting our productivity and agility. I believe that with our collective expertise in DevSecOps, we can identify and implement optimizations to streamline this process.
