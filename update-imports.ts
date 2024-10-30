@@ -1,5 +1,5 @@
 import { Tree, formatFiles, joinPathFragments } from '@nx/devkit';
-import { Project, ImportDeclarationStructure, StructureKind } from 'ts-morph';
+import { Project } from 'ts-morph';
 
 interface UpdateImportsGeneratorSchema {
   objectName: string;
@@ -14,18 +14,19 @@ export default async function updateImportsGenerator(
   const project = new Project();
 
   // Recursively add all TypeScript files in the workspace
-  function addTsFiles(dir: string) {
+  function addTsFilesRecursively(dir: string) {
     tree.children(dir).forEach((fileOrDir) => {
       const fullPath = joinPathFragments(dir, fileOrDir);
       if (tree.isFile(fullPath) && fullPath.endsWith('.ts')) {
+        console.log(`Processing file: ${fullPath}`);
         project.addSourceFileAtPath(fullPath);
       } else if (!tree.isFile(fullPath)) {
-        addTsFiles(fullPath);
+        addTsFilesRecursively(fullPath);
       }
     });
   }
 
-  addTsFiles(tree.root);
+  addTsFilesRecursively(tree.root);
 
   // Iterate through each source file to update imports
   project.getSourceFiles().forEach((sourceFile) => {
@@ -35,28 +36,29 @@ export default async function updateImportsGenerator(
       const namedImports = importDecl.getNamedImports();
       const importPath = importDecl.getModuleSpecifierValue();
 
-      // Find if the specific `objectName` exists in this import declaration
+      // Check for specific import
       const specificImport = namedImports.find((namedImport) => namedImport.getName() === objectName);
 
       if (specificImport) {
-        // Update only the specific import path if `objectName` is found
-        const updatedImports = namedImports
-          .map((namedImport) => {
-            if (namedImport.getName() === objectName) {
-              hasModifications = true;
-              return { kind: StructureKind.ImportSpecifier, name: objectName };
-            }
-            return { kind: StructureKind.ImportSpecifier, name: namedImport.getName() };
-          })
-          .filter((importSpec) => importSpec.name !== '');
+        hasModifications = true;
+        console.log(`Found "${objectName}" in ${sourceFile.getFilePath()}. Updating path to "${newPath}".`);
 
-        // Update the import declaration with the new path and cleaned-up imports
-        importDecl.replaceWithText(
-          `import { ${updatedImports.map((imp) => imp.name).join(', ')} } from '${updatedImports.some((imp) => imp.name === objectName) ? newPath : importPath}';`
-        );
+        // Filter out objectName to create a clean import statement
+        const remainingImports = namedImports
+          .filter((namedImport) => namedImport.getName() !== objectName)
+          .map((namedImport) => namedImport.getName())
+          .join(', ');
+
+        // Update the import declaration
+        const updatedImportText = remainingImports
+          ? `import { ${remainingImports}, ${objectName} } from '${newPath}';`
+          : `import { ${objectName} } from '${newPath}';`;
+
+        importDecl.replaceWithText(updatedImportText);
       }
     });
 
+    // Save file if it was modified
     if (hasModifications) {
       sourceFile.saveSync();
     }
