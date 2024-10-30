@@ -13,13 +13,19 @@ export default async function updateImportsGenerator(
   const { objectName, newPath } = schema;
   const project = new Project();
 
-  // Add all TypeScript files in the workspace
-  tree.visit((filePath) => {
-    if (filePath.endsWith('.ts')) {
-      const fullPath = joinPathFragments(tree.root, filePath);
-      project.addSourceFileAtPath(fullPath);
-    }
-  });
+  // Recursively add all TypeScript files in the workspace
+  function addTsFiles(dir: string) {
+    tree.children(dir).forEach((fileOrDir) => {
+      const fullPath = joinPathFragments(dir, fileOrDir);
+      if (tree.isFile(fullPath) && fullPath.endsWith('.ts')) {
+        project.addSourceFileAtPath(fullPath);
+      } else if (!tree.isFile(fullPath)) {
+        addTsFiles(fullPath);
+      }
+    });
+  }
+
+  addTsFiles(tree.root);
 
   // Iterate through each source file to update imports
   project.getSourceFiles().forEach((sourceFile) => {
