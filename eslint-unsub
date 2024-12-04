@@ -1,0 +1,75 @@
+module.exports = {
+  meta: {
+    type: "problem",
+    docs: {
+      description: "Ensure RxJS observables are unsubscribed, including combineLatest scenarios",
+      category: "Best Practices",
+      recommended: true,
+    },
+    schema: [], // No options
+  },
+  create(context) {
+    const isPipeOperator = (node, operator) => {
+      return (
+        node.callee.property &&
+        node.callee.property.name === "pipe" &&
+        node.arguments.some(
+          (arg) =>
+            arg.type === "CallExpression" && arg.callee.name === operator
+        )
+      );
+    };
+
+    const isCombineLatestCall = (node) => {
+      return (
+        node.callee.type === "MemberExpression" &&
+        node.callee.object &&
+        node.callee.object.name === "combineLatest"
+      );
+    };
+
+    return {
+      CallExpression(node) {
+        // Check if the observable is being subscribed to
+        if (node.callee.property && node.callee.property.name === "subscribe") {
+          const parent = node.parent;
+
+          // Check if the subscription is assigned to a variable
+          if (parent.type !== "VariableDeclarator" && parent.type !== "MemberExpression") {
+            context.report({
+              node,
+              message: "Subscriptions must be assigned to a variable or handled properly.",
+            });
+          }
+
+          // Check if the observable has `takeUntil` or equivalent
+          const isPipeWithTakeUntil = node.callee.object && isPipeOperator(node.callee.object, "takeUntil");
+          if (!isPipeWithTakeUntil) {
+            context.report({
+              node,
+              message: "Observable must use 'takeUntil' or an equivalent operator to manage unsubscription.",
+            });
+          }
+        }
+
+        // Check if combineLatest is used
+        if (isCombineLatestCall(node)) {
+          const parent = node.parent;
+
+          // Ensure combineLatest is properly piped or unsubscribed
+          const isProperlyHandled =
+            parent.type === "VariableDeclarator" || // Assigned to a variable
+            isPipeOperator(node, "takeUntil"); // Used with takeUntil
+
+          if (!isProperlyHandled) {
+            context.report({
+              node,
+              message:
+                "combineLatest must be piped with 'takeUntil' or assigned to a variable to manage unsubscription.",
+            });
+          }
+        }
+      },
+    };
+  },
+};
